@@ -1,0 +1,5 @@
+Initial release.
+
+- Mark climbing holds manually or with optional on-device AI assistance.
+- Assign route roles and refine hold outlines.
+- Save local projects and export full-resolution JPEGs.
