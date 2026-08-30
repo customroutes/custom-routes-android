@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="marked_hold_count">
+        <item quantity="one">%d marked hold</item>
+        <item quantity="other">%d marked holds</item>
+    </plurals>
+    <string name="route_status_ready">ready</string>
+    <string name="route_status_draft">draft</string>
+</resources>
