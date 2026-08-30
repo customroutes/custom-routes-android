@@ -2,6 +2,6 @@ Custom Routes lets you create and share climbing routes from a gym photo.
 
 Choose the holds in your route, assign start, finish, regular, and feet-only roles, then export a full-resolution JPEG with clear outlines. Projects remain editable so you can refine hold boundaries, change roles, undo edits, and return later.
 
-You can mark holds manually or use optional on-device AI assistance. The AI model is downloaded only after you approve it and can be removed from the app's Privacy & Data settings.
+You can mark holds manually or use optional on-device AI assistance. The AI model is downloaded directly from Hugging Face and is not supplied or verified by F-Droid. The app verifies each file's size and SHA-256 digest before use, and the model can be removed from Privacy & Data.
 
 Photos, projects, masks, preferences, and AI inference remain on your device. The app has no analytics, advertising, accounts, or backend service.

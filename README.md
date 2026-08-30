@@ -39,7 +39,9 @@ Manual marking works without an AI model. When you first select an AI tool, the
 app asks before downloading approximately 40 MB of EfficientSAM-Ti model files
 from the project's Hugging Face Space. The files are published under the
 Space's Apache-2.0 repository license and are verified by size and SHA-256 hash
-before use.
+before use. The AI model is downloaded directly from Hugging Face and is not
+supplied or verified by F-Droid. The app explains this before asking for
+consent.
 
 AI inference runs locally on the device. Downloaded model files can be removed
 from the app's Privacy & Data settings.
@@ -68,4 +70,6 @@ The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 ## License
 
 Custom Routes is free software licensed under the GNU General Public License,
-version 3 or later. See `LICENSE`.
+version 3 or later. See `LICENSE`. ONNX Runtime notices and optional AI model
+license and provenance details are documented in `THIRD_PARTY_NOTICES.md` and
+are also available inside the app from **Privacy & Data > AI & runtime notices**.

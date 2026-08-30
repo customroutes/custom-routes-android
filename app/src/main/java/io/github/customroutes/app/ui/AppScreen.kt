@@ -5,6 +5,7 @@ import android.graphics.BlendMode as AndroidBlendMode
 import android.graphics.Paint as AndroidPaint
 import android.graphics.RectF
 import androidx.activity.compose.BackHandler
+import androidx.annotation.RawRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -48,6 +49,7 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PanTool
@@ -83,6 +85,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -114,6 +117,7 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -148,7 +152,36 @@ import io.github.customroutes.app.ml.ModelStatus
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+
+private enum class NoticeDocument(
+    val title: String,
+    val detail: String,
+    @param:RawRes val resourceId: Int,
+) {
+    EFFICIENTSAM_MODEL(
+        title = "EfficientSAM-Ti model details",
+        detail = "Download URLs, sizes, hashes, license evidence, and training provenance.",
+        resourceId = R.raw.efficientsam_model_details,
+    ),
+    EFFICIENTSAM_LICENSE(
+        title = "EfficientSAM Apache License 2.0",
+        detail = "License text supplied for the optional model files.",
+        resourceId = R.raw.efficientsam_license,
+    ),
+    ONNXRUNTIME_LICENSE(
+        title = "ONNX Runtime 1.29.0 MIT License",
+        detail = "Microsoft's license for the packaged Android runtime.",
+        resourceId = R.raw.onnxruntime_license,
+    ),
+    ONNXRUNTIME_NOTICES(
+        title = "ONNX Runtime 1.29.0 third-party notices",
+        detail = "Complete version-matched notices for incorporated components.",
+        resourceId = R.raw.onnxruntime_third_party_notices,
+    ),
+}
 
 @Composable
 fun CustomRoutesApp(
@@ -289,8 +322,12 @@ fun CustomRoutesApp(
                     buildString {
                         if (failure != null) append(failure.message).append("\n\n")
                         append(
-                            "AI hold selection needs a one-time 41 MB download. " +
-                                    "Your photos stay on this device, and AI tools work offline afterward.",
+                            "AI hold selection needs a one-time 41 MB model download. " +
+                                    "The AI model is downloaded directly from Hugging Face and is not " +
+                                    "supplied or verified by F-Droid. Your photos stay on this device, and " +
+                                    "AI tools work offline afterward. Custom Routes verifies each file's " +
+                                    "size and SHA-256 before use. Manual marking works without the download. " +
+                                    "License and model details are always available in Privacy & Data.",
                         )
                     },
                 )
@@ -660,6 +697,12 @@ private fun SliderLabels(start: String, middle: String, end: String) {
 @Composable
 private fun PrivacyDataScreen(state: AppUiState, viewModel: AppViewModel) {
     val actionsEnabled = !state.isApplyingPrivacyAction
+    var showOpenSourceLicenses by rememberSaveable { mutableStateOf(false) }
+    if (showOpenSourceLicenses) {
+        BackHandler { showOpenSourceLicenses = false }
+        OpenSourceLicensesScreen(onBack = { showOpenSourceLicenses = false })
+        return
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),
@@ -697,6 +740,19 @@ private fun PrivacyDataScreen(state: AppUiState, viewModel: AppViewModel) {
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
+            }
+        }
+        item {
+            Text("OPEN SOURCE", style = MaterialTheme.typography.labelMedium)
+        }
+        item {
+            OutlinedButton(
+                onClick = { showOpenSourceLicenses = true },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+            ) {
+                Icon(Icons.Default.Info, contentDescription = null)
+                Spacer(Modifier.width(10.dp))
+                Text("AI & runtime licenses and model details")
             }
         }
         item {
@@ -755,6 +811,107 @@ private fun PrivacyDataScreen(state: AppUiState, viewModel: AppViewModel) {
                 modifier = Modifier.padding(vertical = 8.dp),
             )
         }
+    }
+}
+
+@Composable
+private fun OpenSourceLicensesScreen(onBack: () -> Unit) {
+    var selectedDocumentName by rememberSaveable { mutableStateOf<String?>(null) }
+    val selectedDocument = NoticeDocument.entries.firstOrNull { it.name == selectedDocumentName }
+    BackHandler {
+        if (selectedDocument == null) onBack() else selectedDocumentName = null
+    }
+    if (selectedDocument != null) {
+        NoticeDocumentScreen(selectedDocument, onBack = { selectedDocumentName = null })
+        return
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+                Text(
+                    "AI & runtime notices",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black,
+                )
+            }
+        }
+        item {
+            Text(
+                "These documents are packaged with the app and remain available offline.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        items(NoticeDocument.entries, key = { it.name }) { document ->
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.fillMaxWidth().clickable { selectedDocumentName = document.name },
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(document.title, fontWeight = FontWeight.Bold)
+                    Text(
+                        document.detail,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
+        item { Spacer(Modifier.height(20.dp)) }
+    }
+}
+
+@Composable
+private fun NoticeDocumentScreen(document: NoticeDocument, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val lines by produceState<List<String>?>(initialValue = null, document) {
+        value = withContext(Dispatchers.IO) {
+            context.resources.openRawResource(document.resourceId)
+                .bufferedReader(Charsets.UTF_8)
+                .use { it.readLines() }
+        }
+    }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+    ) {
+        item {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+                Text(
+                    document.title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Black,
+                )
+            }
+        }
+        if (lines == null) {
+            item {
+                Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+        } else {
+            items(lines.orEmpty()) { line ->
+                if (line.isBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                } else {
+                    Text(line, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+        item { Spacer(Modifier.height(20.dp)) }
     }
 }
 

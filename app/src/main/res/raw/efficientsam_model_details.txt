@@ -1,0 +1,48 @@
+EfficientSAM-Ti model details
+
+License
+
+The model files are published under the EfficientSAM Hugging Face Space's
+Apache License 2.0 repository license. The complete Apache License 2.0 text is
+available as the separate "EfficientSAM Apache License 2.0" document in this
+app.
+
+Source and provenance
+
+EfficientSAM source:
+https://github.com/yformer/EfficientSAM
+
+Official ONNX Space:
+https://huggingface.co/spaces/yunyangx/EfficientSAM
+
+The Space's initial license declaration:
+https://huggingface.co/spaces/yunyangx/EfficientSAM/commit/bc92ae9409703d4bccbaa22e914b47f263d7a77e
+
+The first author of the EfficientSAM paper uploaded the audited ONNX files in:
+https://huggingface.co/spaces/yunyangx/EfficientSAM/commit/0e968e688c7f369f010edfa3d0f4ad0805b7e7c7
+
+The corresponding files also appear in the official source repository at:
+https://github.com/yformer/EfficientSAM/commit/f13035d925a0de803e8f733f3239fa05b1fcf36f
+
+Downloaded artifacts
+
+Encoder
+URL: https://huggingface.co/spaces/yunyangx/EfficientSAM/resolve/main/efficientsam_ti_encoder.onnx
+Size: 24,799,761 bytes
+SHA-256: 84ed466ffcc5c1f8d08409bc34a23bb364ab2c15e402cb12d4335a42be0e0951
+
+Decoder
+URL: https://huggingface.co/spaces/yunyangx/EfficientSAM/resolve/main/efficientsam_ti_decoder.onnx
+Size: 16,565,728 bytes
+SHA-256: a62f8fa5ea080447c0689418d69e58f1e83e0b7adf9c142e2bd9bcc8045c0b11
+
+Custom Routes verifies each file's declared size and SHA-256 digest before use.
+The model files are downloaded only after explicit approval and can be deleted
+from Privacy & Data.
+
+Training provenance note
+
+The EfficientSAM paper reports pretraining and fine-tuning involving
+ImageNet-1K, SAM ViT-H features, and SA-1B. Those source datasets have terms
+separate from the authors' Apache-2.0 publication of EfficientSAM. Custom Routes
+does not distribute any training dataset.

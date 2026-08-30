@@ -1,4 +1,5 @@
 import com.android.build.api.artifact.SingleArtifact
+import java.security.MessageDigest
 import java.util.Locale
 import javax.xml.parsers.DocumentBuilderFactory
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -83,6 +84,16 @@ val privacyAudit = tasks.register("privacyAudit") {
     description = "Audits merged manifests and runtime dependencies for privacy drift."
 }
 val dataExtractionRules = layout.projectDirectory.file("src/main/res/xml/data_extraction_rules.xml")
+val requiredNoticeHashes = mapOf(
+    "src/main/res/raw/onnxruntime_third_party_notices.txt" to
+        "53d3fa5821ac016ac24dd35775c996efec86e2ae0841e9a3a5e146c0ae916845",
+    "src/main/res/raw/onnxruntime_license.txt" to
+        "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c",
+    "src/main/res/raw/efficientsam_license.txt" to
+        "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "src/main/res/raw/efficientsam_model_details.txt" to
+        "83a2d1ac84cb2efacdc4328c78bcfcc82b00e2c530cad4aea9f624039be09cdc",
+)
 
 androidComponents.onVariants { variant ->
     val variantName = variant.name
@@ -102,7 +113,18 @@ androidComponents.onVariants { variant ->
         inputs.file(mergedManifest)
         inputs.file(dataExtractionRules)
         inputs.files(resourceDirectories)
+        inputs.files(requiredNoticeHashes.keys.map { layout.projectDirectory.file(it) })
         doLast {
+            requiredNoticeHashes.forEach { (path, expectedHash) ->
+                val notice = layout.projectDirectory.file(path).asFile
+                check(notice.isFile) { "Privacy audit failed: missing required notice $path" }
+                val actualHash = MessageDigest.getInstance("SHA-256")
+                    .digest(notice.readBytes())
+                    .joinToString("") { "%02x".format(it) }
+                check(actualHash == expectedHash) {
+                    "Privacy audit failed: required notice changed: $path"
+                }
+            }
             val androidNamespace = "http://schemas.android.com/apk/res/android"
             val document = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
                 .newDocumentBuilder()
@@ -267,14 +289,21 @@ androidComponents.onVariants { variant ->
                 resolvedClasspath.incoming.resolutionResult.allComponents.map { it.id } +
                     resolvedClasspath.incoming.artifacts.artifacts.map { it.id.componentIdentifier }
                 ).toSet()
+            val moduleIdentifiers = componentIdentifiers.filterIsInstance<ModuleComponentIdentifier>()
+            val onnxRuntime = moduleIdentifiers.singleOrNull {
+                it.group == "com.microsoft.onnxruntime" && it.module == "onnxruntime-android"
+            }
+            check(onnxRuntime?.version == "1.29.0") {
+                "Privacy audit failed: ONNX Runtime notices require onnxruntime-android 1.29.0, found $onnxRuntime"
+            }
             val unapprovedLocalComponents = componentIdentifiers.filterNot { identifier ->
                 identifier is ModuleComponentIdentifier || identifier == rootIdentifier
             }
             check(unapprovedLocalComponents.isEmpty()) {
                 "Privacy audit failed: local runtime dependencies require explicit review: $unapprovedLocalComponents"
             }
-            val dependencyGroups = componentIdentifiers
-                .mapNotNull { (it as? ModuleComponentIdentifier)?.group }
+            val dependencyGroups = moduleIdentifiers
+                .map { it.group }
                 .toSet()
             val unapprovedGroups = dependencyGroups - approvedGroups
             check(unapprovedGroups.isEmpty()) {
