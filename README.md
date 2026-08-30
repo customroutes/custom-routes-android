@@ -9,9 +9,9 @@ your device, and no account is required.
 ## Screenshots
 
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1-projects.jpg" alt="Local projects screen" width="260">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2-editor.jpg" alt="Route editor with marked climbing holds" width="260">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3-result.jpg" alt="Exported climbing route" width="260">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1-projects.jpg" alt="Local projects screen" width="260" align="middle">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2-editor.jpg" alt="Route editor with marked climbing holds" width="260" align="middle">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3-result.jpg" alt="Exported climbing route" width="260" align="middle">
 </p>
 
 ## What You Can Do
