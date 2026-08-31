@@ -1031,16 +1031,16 @@ private fun privacyDialogText(action: PrivacyAction, finalConfirmation: Boolean,
     val preserved = "Original photos and exported JPEGs will not be deleted."
     return when (action) {
         PrivacyAction.DELETE_MODEL ->
-            "The installed model and any partial download will be removed. Manual tools will remain available. $preserved"
+            "This removes the installed model and any partial download. Manual tools will remain available. $preserved"
 
         PrivacyAction.DELETE_PROJECTS -> if (finalConfirmation) {
-            "This cannot be undone. Delete all $projectCount local projects now? $preserved"
+            "This removes all $projectCount local projects. This cannot be undone. $preserved"
         } else {
-            "This will permanently remove all private photo copies, routes, and masks from the app. $preserved"
+            "This removes all private photo copies, routes, and masks from the app. $preserved"
         }
 
         PrivacyAction.DELETE_ALL_DATA -> if (finalConfirmation) {
-            "Android will now clear every private app file and preference, then close the app. $preserved"
+            "This removes every private app file and preference, then closes the app. $preserved"
         } else {
             "This removes all projects, private photo copies, model files, and preferences. $preserved"
         }
