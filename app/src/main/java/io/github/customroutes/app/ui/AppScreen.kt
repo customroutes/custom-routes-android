@@ -92,6 +92,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -155,6 +156,9 @@ import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
@@ -193,6 +197,7 @@ fun CustomRoutesApp(
 ) {
     val snackbarHost = remember { SnackbarHostState() }
     var roleColorTipPresented by rememberSaveable { mutableStateOf(false) }
+    val roleColorTipMessage = "Tip: Long-press a role to change its color, or use Hold colors in Settings."
     LaunchedEffect(state.message) {
         state.message?.let {
             snackbarHost.showSnackbar(it)
@@ -205,13 +210,20 @@ fun CustomRoutesApp(
                     (state.editorMode == EditorMode.EDIT && state.selectedHoldId != null))
     LaunchedEffect(state.shouldShowRoleColorTip, roleControlsVisible) {
         if (state.shouldShowRoleColorTip && roleControlsVisible && !roleColorTipPresented) {
-            roleColorTipPresented = true
-            viewModel.markRoleColorTipShown()
-            snackbarHost.showSnackbar(
-                message = "Tip: Long-press a role to change its color, or use Hold colors in Settings.",
-                actionLabel = "Got it",
-                duration = SnackbarDuration.Long,
-            )
+            coroutineScope {
+                val snackbarJob = launch {
+                    snackbarHost.showSnackbar(
+                        message = roleColorTipMessage,
+                        actionLabel = "Got it",
+                        duration = SnackbarDuration.Long,
+                    )
+                }
+                snapshotFlow { snackbarHost.currentSnackbarData?.visuals?.message }
+                    .first { it == roleColorTipMessage }
+                roleColorTipPresented = true
+                viewModel.markRoleColorTipShown()
+                snackbarJob.join()
+            }
         }
     }
 
@@ -1543,7 +1555,7 @@ private fun AddPanel(state: AppUiState, viewModel: AppViewModel) {
             "Erase",
             Icons.Default.Brush,
             state.draftAction == DraftAction.ERASE,
-            slashedIcon = true,
+            brushOffIcon = true,
             modifier = Modifier.weight(1f),
         ) { viewModel.setDraftAction(DraftAction.ERASE) }
     }
@@ -1626,7 +1638,7 @@ private fun EditPanel(state: AppUiState, project: RouteProject, viewModel: AppVi
                 selected = state.editAction == action && (!needsModel || state.modelStatus is ModelStatus.Ready),
                 enabled = (!needsSelection || selected != null) && (!needsModel || modelControlEnabled),
                 progress = downloading?.fraction.takeIf { needsModel },
-                slashedIcon = action == EditAction.ERASE,
+                brushOffIcon = action == EditAction.ERASE,
                 modifier = Modifier.weight(1f),
             ) { viewModel.setEditAction(action) }
         }
@@ -1654,7 +1666,7 @@ private fun PanelActionButton(
     selected: Boolean,
     enabled: Boolean = true,
     progress: Float? = null,
-    slashedIcon: Boolean = false,
+    brushOffIcon: Boolean = false,
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
@@ -1671,8 +1683,8 @@ private fun PanelActionButton(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (progress == null) {
-                if (slashedIcon) {
-                    SlashedIcon(icon, Modifier.size(19.dp))
+                if (brushOffIcon) {
+                    BrushOffIcon(Modifier.size(19.dp))
                 } else {
                     Icon(icon, contentDescription = null, Modifier.size(19.dp))
                 }
@@ -1689,13 +1701,10 @@ private fun PanelActionButton(
 }
 
 @Composable
-private fun SlashedIcon(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    modifier: Modifier = Modifier,
-) {
+private fun BrushOffIcon(modifier: Modifier = Modifier) {
     val color = LocalContentColor.current
     Box(modifier) {
-        Icon(icon, contentDescription = null, modifier = Modifier.matchParentSize())
+        Icon(Icons.Default.Brush, contentDescription = null, modifier = Modifier.matchParentSize())
         Canvas(Modifier.matchParentSize()) {
             drawLine(
                 color = color,
