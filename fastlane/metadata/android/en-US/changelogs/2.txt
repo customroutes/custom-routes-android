@@ -1,0 +1,8 @@
+Improved editor controls.
+
+- Reworked editor action buttons and refreshed role colors.
+- Removed the AI Exclude tool: the bundled segmentation model cannot
+  represent excluded areas, so exclude taps never took effect. Refine masks
+  with AI Include, paint, and erase instead.
+- Moved hold deletion into the editor action row.
+- Clearer editor tips and consistent data-control dialog wording.
