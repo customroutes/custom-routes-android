@@ -21,6 +21,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        manifestPlaceholders["appLabel"] = "Custom Routes"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -39,6 +40,9 @@ android {
         }
         create("internal") {
             initWith(getByName("release"))
+            applicationIdSuffix = ".internal"
+            versionNameSuffix = "-internal"
+            manifestPlaceholders["appLabel"] = "Custom Routes Internal"
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += "release"
         }
@@ -129,6 +133,8 @@ androidComponents.onVariants { variant ->
             val document = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
                 .newDocumentBuilder()
                 .parse(mergedManifest.get().asFile)
+            val variantApplicationId = document.documentElement.getAttribute("package")
+            val dynamicReceiverPermission = "$variantApplicationId.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
             val application = document.getElementsByTagName("application").item(0)
                 ?: error("Merged manifest has no application element")
             check(application.attributes.getNamedItemNS(androidNamespace, "allowBackup")?.nodeValue == "false") {
@@ -146,7 +152,7 @@ androidComponents.onVariants { variant ->
 
             val expectedPermissions = setOf(
                 "android.permission.INTERNET",
-                "io.github.customroutes.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+                dynamicReceiverPermission,
             )
             val permissions = buildSet {
                 listOf("uses-permission", "uses-permission-sdk-23").forEach { tag ->
@@ -165,7 +171,7 @@ androidComponents.onVariants { variant ->
             }
             check(
                 declaredPermissions.item(0).attributes.getNamedItemNS(androidNamespace, "name")?.nodeValue ==
-                    "io.github.customroutes.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" &&
+                    dynamicReceiverPermission &&
                     declaredPermissions.item(0).attributes.getNamedItemNS(androidNamespace, "protectionLevel")?.nodeValue ==
                     "signature",
             ) {
