@@ -88,9 +88,9 @@ private const val STROKE_PREVIEW_PUBLISH_INTERVAL_NANOS = 25_000_000L
 
 enum class EditorMode { ADD, EDIT, MOVE }
 enum class AddMethod { AI_TAP, MANUAL_PAINT }
-enum class EditAction { SELECT, AI_INCLUDE, AI_EXCLUDE, PAINT, ERASE }
+enum class EditAction { SELECT, AI_INCLUDE, PAINT, ERASE }
 internal enum class StrokeTool { ADD_MANUAL, EDIT_PAINT, EDIT_ERASE }
-enum class AiTool { TAP, INCLUDE, EXCLUDE }
+enum class AiTool { TAP, INCLUDE }
 data class PendingAiRequest(val tool: AiTool, val projectId: String?, val holdId: String?)
 enum class DraftAction { PAINT, ERASE }
 enum class BrushSize(val radiusDp: Float) { SMALL(8f), MEDIUM(16f), LARGE(28f) }
@@ -144,10 +144,6 @@ internal fun AppUiState.completeModelDownload(): AppUiState {
         request?.tool == AiTool.INCLUDE && sameHold && manualDraft == null -> readyState.copy(
             editorMode = EditorMode.EDIT,
             editAction = EditAction.AI_INCLUDE,
-        )
-        request?.tool == AiTool.EXCLUDE && sameHold && manualDraft == null -> readyState.copy(
-            editorMode = EditorMode.EDIT,
-            editAction = EditAction.AI_EXCLUDE,
         )
         else -> readyState
     }
@@ -810,7 +806,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (_state.value.manualDraft != null) return
         val aiTool = when (action) {
             EditAction.AI_INCLUDE -> AiTool.INCLUDE
-            EditAction.AI_EXCLUDE -> AiTool.EXCLUDE
             else -> null
         }
         if (aiTool != null && requestModelSetup(aiTool)) return
@@ -867,8 +862,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             EditorMode.EDIT -> when (snapshot.editAction) {
                 EditAction.SELECT -> selectHold(project, x, y)
-                EditAction.AI_INCLUDE -> refine(project, point, zoom, visibleBounds, positive = true)
-                EditAction.AI_EXCLUDE -> refine(project, point, zoom, visibleBounds, positive = false)
+                EditAction.AI_INCLUDE -> refine(project, point, zoom, visibleBounds)
                 EditAction.PAINT, EditAction.ERASE -> Unit
             }
             EditorMode.MOVE -> Unit
@@ -1495,7 +1489,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         point: SourcePoint,
         zoom: Float,
         visibleBounds: SourceRect,
-        positive: Boolean,
     ) {
         if (_state.value.modelStatus !is ModelStatus.Ready) {
             _state.update { it.copy(message = "Download the segmentation model first") }
@@ -1513,14 +1506,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 prompts += SegmentationPrompt(center.x, center.y, true)
             }
         }
-        if (!positive && prompts.none { it.positive }) {
-            _state.update { it.copy(message = "This empty mask needs a positive point first") }
-            return
-        }
         if (prompts.size == MAX_PROMPTS) {
-            prompts.removeAt(if (prompts.first().positive) 1.coerceAtMost(prompts.lastIndex) else 0)
+            prompts.removeAt(1.coerceAtMost(prompts.lastIndex))
         }
-        prompts += SegmentationPrompt(point.x, point.y, positive)
+        prompts += SegmentationPrompt(point.x, point.y, true)
         runSegmentation(project, selectedId, hold.role, prompts, zoom, visibleBounds, hold.maskRegion)
     }
 
@@ -1550,10 +1539,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
         val plannedBounds = reusableCrop?.sourceBounds ?: requestedBounds
         val promptSnapshot = prompts.toList()
-        val hasPositivePrompt = promptSnapshot.any {
-            it.positive && plannedBounds.contains(SourcePoint(it.x, it.y))
+        val hasPromptInBounds = promptSnapshot.any {
+            plannedBounds.contains(SourcePoint(it.x, it.y))
         }
-        if (!hasPositivePrompt && existingMask?.foregroundPointInside(plannedBounds) == null) {
+        if (!hasPromptInBounds && existingMask?.foregroundPointInside(plannedBounds) == null) {
             _state.update { it.copy(message = "This detailed area needs a positive point on the hold") }
             return
         }
@@ -1628,12 +1617,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         val effectivePrompts = promptSnapshot
                             .filter { inferenceBounds.contains(SourcePoint(it.x, it.y)) }
                             .toMutableList()
-                        if (effectivePrompts.none { it.positive }) {
+                        if (effectivePrompts.isEmpty()) {
                             existingMask?.foregroundPointInside(inferenceBounds)?.let { seed ->
                                 effectivePrompts.add(0, SegmentationPrompt(seed.x, seed.y, true))
                             }
                         }
-                        check(effectivePrompts.any { it.positive }) { "The decoded crop does not contain a positive point" }
+                        check(effectivePrompts.isNotEmpty()) { "The decoded crop does not contain a positive point" }
                         val localPrompts = effectivePrompts.map { prompt ->
                             SegmentationPrompt(
                                 x = (prompt.x - inferenceBounds.left) / inferenceBounds.width * preparedWidth,

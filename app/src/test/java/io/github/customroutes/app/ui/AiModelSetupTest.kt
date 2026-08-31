@@ -38,18 +38,11 @@ class AiModelSetupTest {
             selectedHoldId = "hold",
             pendingAiRequest = PendingAiRequest(AiTool.INCLUDE, "project", "hold"),
         ).completeModelDownload()
-        val exclude = AppUiState(
-            project = projectWithSelectedHold,
-            selectedHoldId = "hold",
-            pendingAiRequest = PendingAiRequest(AiTool.EXCLUDE, "project", "hold"),
-        ).completeModelDownload()
 
         assertEquals(AddMethod.AI_TAP, tap.addMethod)
         assertEquals(EditAction.AI_INCLUDE, include.editAction)
-        assertEquals(EditAction.AI_EXCLUDE, exclude.editAction)
         assertEquals(EditorMode.EDIT, include.editorMode)
-        assertEquals(EditorMode.EDIT, exclude.editorMode)
-        listOf(tap, include, exclude).forEach { state ->
+        listOf(tap, include).forEach { state ->
             assertEquals(ModelStatus.Ready, state.modelStatus)
             assertEquals("AI tools ready offline", state.message)
             assertNull(state.pendingAiRequest)

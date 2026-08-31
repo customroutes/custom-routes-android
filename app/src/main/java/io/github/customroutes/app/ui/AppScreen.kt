@@ -44,7 +44,6 @@ import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.AutoFixHigh
-import androidx.compose.material.icons.filled.AutoFixOff
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
@@ -1581,49 +1580,35 @@ private fun AddPanel(state: AppUiState, viewModel: AppViewModel) {
 @Composable
 private fun EditPanel(state: AppUiState, project: RouteProject, viewModel: AppViewModel) {
     val selected = project.holds.firstOrNull { it.id == state.selectedHoldId }
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Guidance(
-            text = if (state.isPreparingAi) {
-                "Preparing AI"
-            } else {
-                when (state.editAction) {
-                    EditAction.SELECT -> "Tap a hold to select it; tap empty space to clear."
-                    EditAction.AI_INCLUDE -> "Tap an area the AI should include."
-                    EditAction.AI_EXCLUDE -> "Tap an area the AI should exclude."
-                    EditAction.PAINT -> "Drag to paint pixels into the selected mask."
-                    EditAction.ERASE -> "Drag to erase pixels from the selected mask."
-                }
-            },
-            modifier = Modifier.weight(1f),
-        )
-        if (selected != null) {
-            IconButton(onClick = viewModel::removeSelectedHold) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "Delete selected hold",
-                    tint = MaterialTheme.colorScheme.error,
-                )
+    Guidance(
+        text = if (state.isPreparingAi) {
+            "Preparing AI"
+        } else {
+            when (state.editAction) {
+                EditAction.SELECT -> "Tap a hold to select it; tap empty space to clear."
+                EditAction.AI_INCLUDE -> "Tap an area the AI should include."
+                EditAction.PAINT -> "Drag to paint pixels into the selected mask."
+                EditAction.ERASE -> "Drag to erase pixels from the selected mask."
             }
-        }
-    }
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         EditAction.entries.forEach { action ->
             val label = when (action) {
                 EditAction.SELECT -> "Select"
                 EditAction.AI_INCLUDE -> "AI Include"
-                EditAction.AI_EXCLUDE -> "AI Exclude"
                 EditAction.PAINT -> "Paint"
                 EditAction.ERASE -> "Erase"
             }
             val icon = when (action) {
                 EditAction.SELECT -> Icons.Default.PanTool
                 EditAction.AI_INCLUDE -> Icons.Default.AutoFixHigh
-                EditAction.AI_EXCLUDE -> Icons.Default.AutoFixOff
                 EditAction.PAINT -> Icons.Default.Brush
                 EditAction.ERASE -> Icons.Default.Brush
             }
             val needsSelection = action != EditAction.SELECT
-            val needsModel = action == EditAction.AI_INCLUDE || action == EditAction.AI_EXCLUDE
+            val needsModel = action == EditAction.AI_INCLUDE
             val downloading = state.modelStatus as? ModelStatus.Downloading
             val modelControlEnabled = state.modelStatus !is ModelStatus.Checking && downloading == null
             PanelActionButton(
@@ -1642,6 +1627,14 @@ private fun EditPanel(state: AppUiState, project: RouteProject, viewModel: AppVi
                 modifier = Modifier.weight(1f),
             ) { viewModel.setEditAction(action) }
         }
+        PanelActionButton(
+            label = "Delete",
+            icon = Icons.Default.Delete,
+            selected = false,
+            enabled = selected != null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.weight(1f),
+        ) { viewModel.removeSelectedHold() }
     }
     if (selected != null) {
         if (state.editAction == EditAction.PAINT || state.editAction == EditAction.ERASE) {
@@ -1667,14 +1660,17 @@ private fun PanelActionButton(
     enabled: Boolean = true,
     progress: Float? = null,
     brushOffIcon: Boolean = false,
+    tint: Color? = null,
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
     Surface(
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-        contentColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(
-            alpha = 0.38f
-        ),
+        contentColor = when {
+            !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+            tint != null -> tint
+            else -> MaterialTheme.colorScheme.onSurface
+        },
         shape = RoundedCornerShape(10.dp),
         modifier = modifier.clickable(enabled = enabled, onClick = onClick),
     ) {
