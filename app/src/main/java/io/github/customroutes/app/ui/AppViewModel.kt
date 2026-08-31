@@ -8,6 +8,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.customroutes.app.data.AiPreferences
+import io.github.customroutes.app.data.EditorHintPreferences
 import io.github.customroutes.app.data.ProjectRepository
 import io.github.customroutes.app.data.ProjectSummary
 import io.github.customroutes.app.data.AppearancePreferences
@@ -204,6 +205,7 @@ data class AppUiState(
     val bitmap: Bitmap? = null,
     val roleColors: Map<HoldRole, Int> = DEFAULT_ROLE_COLORS,
     val appearanceSettings: AppearanceSettings = DEFAULT_APPEARANCE_SETTINGS,
+    val shouldShowRoleColorTip: Boolean = true,
     val improveAiDetailWhenZoomed: Boolean = true,
     val activeRole: HoldRole = HoldRole.REGULAR,
     val editorMode: EditorMode = EditorMode.ADD,
@@ -240,6 +242,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val exporter = RouteExporter(application, repository)
     private val modelManager = ModelManager(application)
     private val aiPreferences = AiPreferences(application)
+    private val editorHintPreferences = EditorHintPreferences(application)
     private val roleColorPreferences = RoleColorPreferences(application)
     private val appearancePreferences = AppearancePreferences(application)
     private val thumbnailCache = ProjectThumbnailCache(application)
@@ -293,6 +296,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         AppUiState(
             roleColors = roleColorPreferences.load(),
             appearanceSettings = appearancePreferences.load(),
+            shouldShowRoleColorTip = editorHintPreferences.shouldShowRoleColorTip(),
             improveAiDetailWhenZoomed = aiPreferences.loadImproveAiDetailWhenZoomed(),
         ),
     )
@@ -1118,6 +1122,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearMessage() {
         _state.update { it.copy(message = null) }
+    }
+
+    fun markRoleColorTipShown() {
+        editorHintPreferences.markRoleColorTipShown()
     }
 
     fun openPrivacyData() {

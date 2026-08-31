@@ -10,7 +10,7 @@ enum class HoldRole {
         get() = when (this) {
             START -> 0xFFEF4444.toInt()
             FINISH -> 0xFF2563EB.toInt()
-            REGULAR -> 0xFFF97316.toInt()
+            REGULAR -> 0xFF22C55E.toInt()
             FEET_ONLY -> 0xFFFACC15.toInt()
         }
 }

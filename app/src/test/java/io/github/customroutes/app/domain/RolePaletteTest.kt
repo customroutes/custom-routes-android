@@ -10,4 +10,9 @@ class RolePaletteTest {
         assertEquals(16, ROLE_COLOR_CHOICES.distinct().size)
         assertTrue(DEFAULT_ROLE_COLORS.values.all(ROLE_COLOR_CHOICES::contains))
     }
+
+    @Test
+    fun regularHoldDefaultsToGreen() {
+        assertEquals(0xFF22C55E.toInt(), DEFAULT_ROLE_COLORS[HoldRole.REGULAR])
+    }
 }

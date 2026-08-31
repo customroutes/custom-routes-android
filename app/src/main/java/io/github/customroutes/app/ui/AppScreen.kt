@@ -44,6 +44,7 @@ import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.AutoFixOff
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
@@ -54,7 +55,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PanTool
 import androidx.compose.material.icons.filled.PrivacyTip
-import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
@@ -68,6 +68,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -75,6 +76,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -190,10 +192,26 @@ fun CustomRoutesApp(
     onPickPhoto: () -> Unit,
 ) {
     val snackbarHost = remember { SnackbarHostState() }
+    var roleColorTipPresented by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(state.message) {
         state.message?.let {
             snackbarHost.showSnackbar(it)
             viewModel.clearMessage()
+        }
+    }
+    val roleControlsVisible = state.project != null && state.bitmap != null &&
+            !state.showSettings && state.exportPreview == null &&
+            (state.editorMode == EditorMode.ADD ||
+                    (state.editorMode == EditorMode.EDIT && state.selectedHoldId != null))
+    LaunchedEffect(state.shouldShowRoleColorTip, roleControlsVisible) {
+        if (state.shouldShowRoleColorTip && roleControlsVisible && !roleColorTipPresented) {
+            roleColorTipPresented = true
+            viewModel.markRoleColorTipShown()
+            snackbarHost.showSnackbar(
+                message = "Tip: Long-press a role to change its color, or use Hold colors in Settings.",
+                actionLabel = "Got it",
+                duration = SnackbarDuration.Long,
+            )
         }
     }
 
@@ -495,7 +513,7 @@ private fun SettingsScreen(state: AppUiState, viewModel: AppViewModel) {
                 Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black)
             }
         }
-        item { SettingsExportPreview(state.roleColors, settings) }
+        item { SettingsExportPreview(state.roleColors, settings, viewModel::setRoleColor) }
         item { Text("BORDERS", style = MaterialTheme.typography.labelMedium) }
         item {
             Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(18.dp)) {
@@ -603,7 +621,9 @@ private fun SettingsScreen(state: AppUiState, viewModel: AppViewModel) {
 private fun SettingsExportPreview(
     roleColors: Map<HoldRole, Int>,
     settings: AppearanceSettings,
+    onColorChange: (HoldRole, Int) -> Unit,
 ) {
+    var editingColorFor by remember { mutableStateOf<HoldRole?>(null) }
     val photo = ImageBitmap.imageResource(R.drawable.settings_preview_photo)
     val routeMask = ImageBitmap.imageResource(R.drawable.settings_preview_route_mask)
     Surface(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(18.dp)) {
@@ -643,21 +663,35 @@ private fun SettingsExportPreview(
                 drawImage(image = routeMask, dstSize = destination, blendMode = BlendMode.DstOut)
                 drawContext.canvas.restore()
             }
-            PreviewColorKey(roleColors)
+            PreviewColorKey(roleColors) { editingColorFor = it }
         }
+    }
+    editingColorFor?.let { role ->
+        RoleColorDialog(
+            role = role,
+            colors = roleColors,
+            onColorChange = onColorChange,
+            onDismiss = { editingColorFor = null },
+        )
     }
 }
 
 @Composable
-private fun PreviewColorKey(roleColors: Map<HoldRole, Int>) {
+private fun PreviewColorKey(roleColors: Map<HoldRole, Int>, onEditColor: (HoldRole) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Hold colors", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Text(
+            "Tap a hold type to change its color. Changes apply to all projects.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            PreviewColorKeyItem(HoldRole.START, "Start", roleColors, Modifier.weight(1f))
-            PreviewColorKeyItem(HoldRole.FINISH, "Finish", roleColors, Modifier.weight(1f))
+            PreviewColorKeyItem(HoldRole.START, "Start", roleColors, onEditColor, Modifier.weight(1f))
+            PreviewColorKeyItem(HoldRole.FINISH, "Finish", roleColors, onEditColor, Modifier.weight(1f))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            PreviewColorKeyItem(HoldRole.REGULAR, "Regular", roleColors, Modifier.weight(1f))
-            PreviewColorKeyItem(HoldRole.FEET_ONLY, "Feet-only", roleColors, Modifier.weight(1f))
+            PreviewColorKeyItem(HoldRole.REGULAR, "Regular", roleColors, onEditColor, Modifier.weight(1f))
+            PreviewColorKeyItem(HoldRole.FEET_ONLY, "Feet-only", roleColors, onEditColor, Modifier.weight(1f))
         }
     }
 }
@@ -667,16 +701,27 @@ private fun PreviewColorKeyItem(
     role: HoldRole,
     label: String,
     roleColors: Map<HoldRole, Int>,
+    onEditColor: (HoldRole) -> Unit,
     modifier: Modifier,
 ) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Surface(
-            color = Color(roleColors[role] ?: role.argb),
-            shape = CircleShape,
-            modifier = Modifier.size(10.dp),
-        ) {}
-        Spacer(Modifier.width(7.dp))
-        Text(label, style = MaterialTheme.typography.bodySmall)
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp),
+        modifier = modifier.clickable { onEditColor(role) },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                color = Color(roleColors[role] ?: role.argb),
+                shape = CircleShape,
+                modifier = Modifier.size(18.dp),
+            ) {}
+            Spacer(Modifier.width(7.dp))
+            Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+            Icon(Icons.Default.Palette, contentDescription = null, modifier = Modifier.size(16.dp))
+        }
     }
 }
 
@@ -1496,8 +1541,9 @@ private fun AddPanel(state: AppUiState, viewModel: AppViewModel) {
         }
         PanelActionButton(
             "Erase",
-            Icons.Default.RemoveCircleOutline,
+            Icons.Default.Brush,
             state.draftAction == DraftAction.ERASE,
+            slashedIcon = true,
             modifier = Modifier.weight(1f),
         ) { viewModel.setDraftAction(DraftAction.ERASE) }
     }
@@ -1523,7 +1569,6 @@ private fun AddPanel(state: AppUiState, viewModel: AppViewModel) {
 @Composable
 private fun EditPanel(state: AppUiState, project: RouteProject, viewModel: AppViewModel) {
     val selected = project.holds.firstOrNull { it.id == state.selectedHoldId }
-    var holdMenuExpanded by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Guidance(
             text = if (state.isPreparingAi) {
@@ -1540,20 +1585,12 @@ private fun EditPanel(state: AppUiState, project: RouteProject, viewModel: AppVi
             modifier = Modifier.weight(1f),
         )
         if (selected != null) {
-            Box {
-                IconButton(onClick = { holdMenuExpanded = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Selected hold menu")
-                }
-                DropdownMenu(expanded = holdMenuExpanded, onDismissRequest = { holdMenuExpanded = false }) {
-                    DropdownMenuItem(
-                        text = { Text("Delete hold") },
-                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
-                        onClick = {
-                            holdMenuExpanded = false
-                            viewModel.removeSelectedHold()
-                        },
-                    )
-                }
+            IconButton(onClick = viewModel::removeSelectedHold) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Delete selected hold",
+                    tint = MaterialTheme.colorScheme.error,
+                )
             }
         }
     }
@@ -1568,9 +1605,10 @@ private fun EditPanel(state: AppUiState, project: RouteProject, viewModel: AppVi
             }
             val icon = when (action) {
                 EditAction.SELECT -> Icons.Default.PanTool
-                EditAction.AI_INCLUDE, EditAction.AI_EXCLUDE -> Icons.Default.AutoFixHigh
+                EditAction.AI_INCLUDE -> Icons.Default.AutoFixHigh
+                EditAction.AI_EXCLUDE -> Icons.Default.AutoFixOff
                 EditAction.PAINT -> Icons.Default.Brush
-                EditAction.ERASE -> Icons.Default.RemoveCircleOutline
+                EditAction.ERASE -> Icons.Default.Brush
             }
             val needsSelection = action != EditAction.SELECT
             val needsModel = action == EditAction.AI_INCLUDE || action == EditAction.AI_EXCLUDE
@@ -1588,6 +1626,7 @@ private fun EditPanel(state: AppUiState, project: RouteProject, viewModel: AppVi
                 selected = state.editAction == action && (!needsModel || state.modelStatus is ModelStatus.Ready),
                 enabled = (!needsSelection || selected != null) && (!needsModel || modelControlEnabled),
                 progress = downloading?.fraction.takeIf { needsModel },
+                slashedIcon = action == EditAction.ERASE,
                 modifier = Modifier.weight(1f),
             ) { viewModel.setEditAction(action) }
         }
@@ -1615,6 +1654,7 @@ private fun PanelActionButton(
     selected: Boolean,
     enabled: Boolean = true,
     progress: Float? = null,
+    slashedIcon: Boolean = false,
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
@@ -1631,7 +1671,11 @@ private fun PanelActionButton(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (progress == null) {
-                Icon(icon, contentDescription = null, Modifier.size(19.dp))
+                if (slashedIcon) {
+                    SlashedIcon(icon, Modifier.size(19.dp))
+                } else {
+                    Icon(icon, contentDescription = null, Modifier.size(19.dp))
+                }
             } else {
                 CircularProgressIndicator(
                     progress = { progress },
@@ -1640,6 +1684,26 @@ private fun PanelActionButton(
                 )
             }
             Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 2)
+        }
+    }
+}
+
+@Composable
+private fun SlashedIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+) {
+    val color = LocalContentColor.current
+    Box(modifier) {
+        Icon(icon, contentDescription = null, modifier = Modifier.matchParentSize())
+        Canvas(Modifier.matchParentSize()) {
+            drawLine(
+                color = color,
+                start = Offset(size.width * 0.12f, size.height * 0.12f),
+                end = Offset(size.width * 0.88f, size.height * 0.88f),
+                strokeWidth = 2.dp.toPx(),
+                cap = StrokeCap.Round,
+            )
         }
     }
 }
@@ -1709,47 +1773,62 @@ private fun RoleRow(
         )
     }
     editingColorFor?.let { role ->
-        AlertDialog(
-            onDismissRequest = { editingColorFor = null },
-            title = { Text("${role.displayName} color") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ROLE_COLOR_CHOICES.chunked(4).forEach { rowColors ->
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                            rowColors.forEach { argb ->
-                                val selectedColor = colors[role] == argb
-                                Surface(
-                                    color = Color(argb),
-                                    contentColor = contrastingContentColor(Color(argb)),
-                                    shape = CircleShape,
-                                    border = BorderStroke(
-                                        if (selectedColor) 3.dp else 1.dp,
-                                        if (selectedColor) MaterialTheme.colorScheme.onSurface else Color.Black.copy(
-                                            alpha = 0.35f
-                                        ),
+        RoleColorDialog(
+            role = role,
+            colors = colors,
+            onColorChange = onColorChange,
+            onDismiss = { editingColorFor = null },
+        )
+    }
+}
+
+@Composable
+private fun RoleColorDialog(
+    role: HoldRole,
+    colors: Map<HoldRole, Int>,
+    onColorChange: (HoldRole, Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("${role.displayName} color") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ROLE_COLOR_CHOICES.chunked(4).forEach { rowColors ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        rowColors.forEach { argb ->
+                            val selectedColor = colors[role] == argb
+                            Surface(
+                                color = Color(argb),
+                                contentColor = contrastingContentColor(Color(argb)),
+                                shape = CircleShape,
+                                border = BorderStroke(
+                                    if (selectedColor) 3.dp else 1.dp,
+                                    if (selectedColor) MaterialTheme.colorScheme.onSurface else Color.Black.copy(
+                                        alpha = 0.35f
                                     ),
-                                    modifier = Modifier.size(48.dp).clickable {
-                                        onColorChange(role, argb)
-                                        editingColorFor = null
-                                    },
-                                ) {
-                                    if (selectedColor) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(Icons.Default.Check, contentDescription = "Selected color")
-                                        }
+                                ),
+                                modifier = Modifier.size(48.dp).clickable {
+                                    onColorChange(role, argb)
+                                    onDismiss()
+                                },
+                            ) {
+                                if (selectedColor) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Check, contentDescription = "Selected color")
                                     }
                                 }
                             }
                         }
                     }
-                    Text("Applies to all projects", style = MaterialTheme.typography.bodySmall)
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { editingColorFor = null }) { Text("Close") }
-            },
-        )
-    }
+                Text("Applies to all projects", style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        },
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
